@@ -20,38 +20,59 @@
   </div>
 
   <script>
+    const modelName = "google/gemma-3-1b";  // Confirmed model name
+    const conversation = []; // Keeps track of chat history
+
     async function sendMessage() {
-      const userInput = document.getElementById("userInput").value;
+      const inputField = document.getElementById("userInput");
+      const userInput = inputField.value.trim();
       const messagesDiv = document.getElementById("messages");
 
-      // Add user's message
+      if (!userInput) return;
+
+      // Add user's message to UI and conversation
+      conversation.push({ role: "user", content: userInput });
       const userMsg = document.createElement("div");
       userMsg.classList.add("message", "user");
       userMsg.textContent = "You: " + userInput;
       messagesDiv.appendChild(userMsg);
+      inputField.value = "";
 
-      // Clear input
-      document.getElementById("userInput").value = "";
+      try {
+        const response = await fetch("http://localhost:1234/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: modelName,
+            messages: conversation,
+            temperature: 0.7
+          })
+        });
 
-      // Send to LM Studio
-      const res = await fetch("http://localhost:1234/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "gemma:3b",  // Adjust this if your model name is different
-          messages: [{ role: "user", content: userInput }],
-          temperature: 0.7
-        })
-      });
+        const data = await response.json();
 
-      const data = await res.json();
+        if (!data.choices || !data.choices[0]) {
+          throw new Error("Invalid response format");
+        }
 
-      const botMsg = document.createElement("div");
-      botMsg.classList.add("message", "bot");
-      botMsg.textContent = "AI: " + data.choices[0].message.content;
-      messagesDiv.appendChild(botMsg);
+        const botReply = data.choices[0].message.content;
+        conversation.push({ role: "assistant", content: botReply });
 
-      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        const botMsg = document.createElement("div");
+        botMsg.classList.add("message", "bot");
+        botMsg.textContent = "AI: " + botReply;
+        messagesDiv.appendChild(botMsg);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+      } catch (err) {
+        const errorMsg = document.createElement("div");
+        errorMsg.classList.add("message", "bot");
+        errorMsg.style.color = "red";
+        errorMsg.textContent = "⚠️ Error: " + err.message;
+        messagesDiv.appendChild(errorMsg);
+      }
     }
   </script>
 </body>
